@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KDP Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f6f1e9; --card:#fffdf9; --ink:#2b2a24; --muted:#7a7468; --line:#e6ddcf;
+  --accent:#b5523b; --accent-2:#8c3b28; --olive:#5b6b3a; --warn:#b07a12; --bad:#a3332a; --ok:#3f7a46;
+  --r:14px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Inter,system-ui,sans-serif}
+h1,h2,h3{font-family:Fraunces,Georgia,serif;font-weight:700;margin:0;letter-spacing:-.01em}
+a{color:var(--accent)}
+button{font:inherit;cursor:pointer;border:0;border-radius:10px;padding:10px 16px;background:var(--accent);color:#fff;font-weight:600}
+button:hover{background:var(--accent-2)} button:disabled{opacity:.5;cursor:default}
+button.ghost{background:transparent;color:var(--accent);border:1px solid var(--line)}
+button.small{padding:6px 10px;font-size:13px}
+input,select{font:inherit;width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+.wrap{max-width:1100px;margin:0 auto;padding:20px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line);background:var(--card);position:sticky;top:0;z-index:5}
+.logo{display:flex;align-items:center;gap:10px}
+.logo span{width:34px;height:34px;border-radius:9px;background:var(--accent);display:grid;place-items:center;color:#fff;font:700 18px Fraunces}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px}
+.grid{display:grid;grid-template-columns:340px 1fr;gap:18px}
+@media(max-width:860px){.grid{grid-template-columns:1fr} body.has-book main{order:-1}}
+.books{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.book{padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#fff;cursor:pointer}
+.book.sel{border-color:var(--accent);box-shadow:0 0 0 2px #b5523b22}
+.book b{display:block}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.muted{color:var(--muted);font-size:13px}
+.badge{display:inline-block;font-size:12px;font-weight:600;padding:3px 9px;border-radius:99px;background:#efe7da;color:var(--ink)}
+.badge.run{background:#fbeccb;color:var(--warn)} .badge.wait{background:#e5ecd8;color:var(--olive)}
+.badge.ok{background:#dcefdd;color:var(--ok)} .badge.bad{background:#f6dcd8;color:var(--bad)}
+.steps{display:flex;gap:6px;margin:14px 0;flex-wrap:wrap}
+.step{flex:1;min-width:90px;font-size:12px;text-align:center;padding:8px 4px;border-radius:9px;background:#efe7da;color:var(--muted)}
+.step.done{background:#dcefdd;color:var(--ok)} .step.now{background:var(--accent);color:#fff}
+.prompt{border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0;background:#fff}
+.prompt pre{white-space:pre-wrap;font:13px/1.45 ui-monospace,Menlo,monospace;background:#faf6ef;border-radius:8px;padding:10px;margin:8px 0 0;max-height:150px;overflow:auto}
+.code{font:700 15px ui-monospace,Menlo,monospace;color:var(--accent)}
+.dl{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px;border:1px solid var(--line);border-radius:12px;background:#fff;margin:8px 0}
+.err{background:#f6dcd8;color:var(--bad);padding:10px 12px;border-radius:10px;font-size:14px;margin:10px 0;word-break:break-word}
+.note{background:#f3ecdf;padding:10px 12px;border-radius:10px;font-size:14px;margin:10px 0}
+table{width:100%;border-collapse:collapse;font-size:13px} td,th{padding:6px 4px;border-bottom:1px solid var(--line);text-align:left}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid #e2b9ad;border-top-color:var(--accent);border-radius:50%;animation:s 1s linear infinite;vertical-align:-2px}
+@keyframes s{to{transform:rotate(360deg)}}
+#login{max-width:380px;margin:12vh auto}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;display:none;z-index:9}
+.checks{display:flex;gap:16px} .checks label{display:flex;gap:6px;align-items:center;margin:6px 0;color:var(--ink);font-size:14px} .checks input{width:auto}
+</style>
+</head>
+<body>
+
+<div id="login" class="card" hidden>
+  <div class="logo" style="margin-bottom:14px"><span>K</span><h2>KDP Studio</h2></div>
+  <label>Email</label><input id="email" type="email" autocomplete="username">
+  <label>Mot de passe</label><input id="pw" type="password" autocomplete="current-password">
+  <div style="margin-top:14px"><button id="btnLogin" style="width:100%">Se connecter</button></div>
+  <div id="loginErr" class="err" hidden></div>
+</div>
+
+<div id="app" hidden>
+  <header>
+    <div class="logo"><span>K</span><div><h3>KDP Studio</h3><div class="muted">Recettes → ebooks Amazon KDP</div></div></div>
+    <div class="row"><span id="who" class="muted"></span><button class="ghost small" id="btnOut">Déconnexion</button></div>
+  </header>
+  <div class="wrap grid">
+    <aside>
+      <div class="card">
+        <h3>Nouveau livre</h3>
+        <label>Blog source</label><select id="nSite"></select>
+        <label>Thème du livre</label><input id="nTheme" placeholder="Heißluftfritteuse für Anfänger">
+        <div class="row" style="gap:10px">
+          <div style="flex:1"><label>Recettes</label><input id="nN" type="number" value="50" min="5" max="120"></div>
+          <div style="flex:2"><label>Nom d'auteur (optionnel)</label><input id="nAuthor" placeholder="auto par blog"></div>
+        </div>
+        <label>Identifiant (auto)</label><input id="nSlug" placeholder="airfryer-anfaenger-de">
+        <div style="margin-top:12px"><button id="btnCreate" style="width:100%">Créer et préparer</button></div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <div class="row" style="justify-content:space-between"><h3>Mes livres</h3><button class="ghost small" id="btnRefresh">↻</button></div>
+        <div id="books" class="books"></div>
+      </div>
+    </aside>
+    <main id="detail" class="card"><div class="muted">Choisis un livre ou crée-en un.</div></main>
+  </div>
+</div>
+<div id="toast" class="toast"></div>
+
+<script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+const SUPABASE_URL = "https://kuhxuovjlukxdzjnsyzt.supabase.co";
+const SUPABASE_KEY = "sb_publishable_ONExiZZVqMmaEPkJfXGEPw_J1ohmmpV";   // public key — data protected by RLS (allowed_users)
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const toast = (m) => { const t = $("toast"); t.textContent = m; t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", 2600); };
+const slugify = (s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ß/g, "ss").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 55);
+
+const RUNNING = ["queued", "selecting", "fetching", "rewriting", "prompts", "images", "translating", "extras", "building"];
+const LABEL = { draft: "Brouillon", queued: "En file d'attente", selecting: "Choix des recettes", fetching: "Lecture du blog",
+  rewriting: "Réécriture", prompts: "Prompts images", waiting_images: "Images à faire", images: "Import des images",
+  translating: "Traduction", extras: "Chapitres bonus", building: "Création de l'ebook", review: "Prêt à télécharger",
+  ready: "Prêt", published: "Publié", failed: "Erreur" };
+const badge = (s) => `<span class="badge ${RUNNING.includes(s) ? "run" : s === "waiting_images" ? "wait" : ["review","ready","published"].includes(s) ? "ok" : s === "failed" ? "bad" : ""}">${RUNNING.includes(s) ? '<span class="spin"></span> ' : ""}${LABEL[s] || s}</span>`;
+
+let sites = [], books = [], current = null, poll = null;
+
+async function call(command, book, extra = {}) {
+  const { data, error } = await sb.functions.invoke("kdp-run", { body: { command, book, ...extra } });
+  if (error) {
+    let msg = error.message;
+    try { msg = (await error.context.json()).error || msg; } catch {}
+    throw new Error(msg);
+  }
+  return data;
+}
+
+// ───────── auth ─────────
+async function boot() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { $("login").hidden = false; $("app").hidden = true; return; }
+  $("login").hidden = true; $("app").hidden = false; $("who").textContent = session.user.email;
+  await loadSites(); await loadBooks();
+  const h = location.hash.slice(1); if (h) openBook(h);
+}
+$("btnLogin").onclick = async () => {
+  $("loginErr").hidden = true;
+  const { error } = await sb.auth.signInWithPassword({ email: $("email").value.trim(), password: $("pw").value });
+  if (error) { $("loginErr").textContent = error.message; $("loginErr").hidden = false; } else boot();
+};
+$("pw").onkeydown = (e) => { if (e.key === "Enter") $("btnLogin").click(); };
+$("btnOut").onclick = async () => { await sb.auth.signOut(); location.hash = ""; boot(); };
+
+// ───────── data ─────────
+async function loadSites() {
+  const { data } = await sb.from("sites").select("id,domain").order("domain");
+  sites = (data || []).filter((s) => /rezept|airfryer|plaetzchen|kochliebe|foodzauber|yum|schnell|zimt|waffel|kaese|gulasch|pfannkuchen/i.test(s.domain));
+  if (!sites.length) sites = data || [];
+  $("nSite").innerHTML = sites.map((s) => `<option value="${s.id}">${esc(s.domain)}</option>`).join("");
+}
+async function loadBooks() {
+  const { data, error } = await sb.from("kdp_books").select("id,slug,theme,title,status,language,parent_book_id,cost_mad,created_at,target_recipes")
+    .is("parent_book_id", null).order("created_at", { ascending: false });
+  if (error) { $("books").innerHTML = `<div class="err">${esc(error.message)}</div>`; return; }
+  books = data || [];
+  $("books").innerHTML = books.length ? books.map((b) => `
+    <div class="book ${current === b.slug ? "sel" : ""}" data-slug="${esc(b.slug)}">
+      <b>${esc(b.title || b.theme)}</b>
+      <div class="row" style="justify-content:space-between;margin-top:4px">${badge(b.status)}<span class="muted">${esc(b.slug)}</span></div>
+    </div>`).join("") : `<div class="muted">Aucun livre.</div>`;
+  document.querySelectorAll(".book").forEach((el) => el.onclick = () => openBook(el.dataset.slug));
+}
+$("btnRefresh").onclick = () => { loadBooks(); if (current) openBook(current); };
+
+// ───────── create ─────────
+$("nTheme").oninput = () => { if (!$("nSlug")._edited) $("nSlug").value = slugify($("nTheme").value) + "-de"; };
+$("nSlug").oninput = () => $("nSlug")._edited = true;
+$("btnCreate").onclick = async () => {
+  const theme = $("nTheme").value.trim(), slug = slugify($("nSlug").value || theme + "-de");
+  if (!theme) return toast("Écris le thème du livre");
+  $("btnCreate").disabled = true;
+  try {
+    const { error } = await sb.from("kdp_books").insert({
+      slug, site_id: $("nSite").value, language: "de", marketplace: "amazon.de", theme,
+      target_recipes: Math.max(5, Math.min(120, +$("nN").value || 50)), author_name: $("nAuthor").value.trim() || null });
+    if (error) throw new Error(error.code === "23505" ? "Cet identifiant existe déjà" : error.message);
+    await call("prepare", slug);
+    toast("Préparation lancée (5–15 min)");
+    $("nTheme").value = ""; $("nSlug").value = ""; $("nSlug")._edited = false;
+    await loadBooks(); openBook(slug);
+  } catch (e) { toast("❌ " + e.message); }
+  $("btnCreate").disabled = false;
+};
+
+// ───────── detail ─────────
+const FLOW = ["queued", "selecting", "fetching", "rewriting", "prompts", "waiting_images", "images", "extras", "building", "review"];
+function stepper(status) {
+  const groups = [["Préparation", ["queued", "selecting", "fetching", "rewriting", "prompts"]], ["Tes images", ["waiting_images"]],
+    ["Création", ["images", "translating", "extras", "building"]], ["Téléchargement", ["review", "ready", "published"]]];
+  const idx = groups.findIndex((g) => g[1].includes(status));
+  return `<div class="steps">${groups.map((g, i) => `<div class="step ${i < idx ? "done" : i === idx ? "now" : ""}">${i + 1}. ${g[0]}</div>`).join("")}</div>`;
+}
+
+async function openBook(slug) {
+  current = slug; location.hash = slug; document.body.classList.add("has-book");
+  document.querySelectorAll(".book").forEach((el) => el.classList.toggle("sel", el.dataset.slug === slug));
+  const { data: b } = await sb.from("kdp_books").select("*").eq("slug", slug).maybeSingle();
+  if (!b) { $("detail").innerHTML = `<div class="muted">Livre introuvable.</div>`; return; }
+  const { data: recs } = await sb.from("kdp_book_recipes").select("id,status,chapter,error,source_url,recipe->>title,source->>code,source->>prompt")
+    .eq("book_id", b.id).order("position");
+  const { data: kids } = await sb.from("kdp_books").select("slug,language,status,download_token,download_expires_at,downloaded_at,files,page_count,error")
+    .eq("parent_book_id", b.id);
+  const ok = (recs || []).filter((r) => r.status === "ok");
+  const bad = (recs || []).filter((r) => ["failed", "skip"].includes(r.status) && r.error !== "reserve not needed");
+  const files = b.files || {};
+
+  let h = `<div class="row" style="justify-content:space-between"><div><h2>${esc(b.title || b.theme)}</h2>
+    <div class="muted">${esc(b.slug)} · ${esc(b.marketplace)} · ${ok.length}/${b.target_recipes} recettes · coût ${(+b.cost_mad).toFixed(2)} MAD</div></div>${badge(b.status)}</div>`;
+  h += stepper(b.status);
+  if (b.error) h += `<div class="err">${esc(b.error)}</div>`;
+
+  if (RUNNING.includes(b.status)) {
+    h += `<div class="note"><span class="spin"></span> ${LABEL[b.status]}… La page se met à jour toute seule. Tu peux fermer et revenir plus tard.</div>`;
+  }
+  if (b.status === "failed") {
+    const next = ok.length && ok.every((r) => r.prompt) ? null : "prepare";
+    h += `<div class="row">${next ? `<button data-act="prepare">Relancer la préparation</button>` : ""}
+      ${ok.length && ok.every((r) => r.prompt) ? `<span class="muted">Corrige le lien Drive puis relance « Générer l'ebook » plus bas.</span>` : ""}</div>`;
+  }
+
+  // images step
+  const promptsReady = ok.length && ok.every((r) => r.prompt) && files.cover_prompt;
+  if (promptsReady && ["waiting_images", "failed", "review", "ready"].includes(b.status)) {
+    const doneImgs = ["review", "ready"].includes(b.status);
+    h += `${doneImgs ? `<details style="margin-top:18px"><summary class="muted">Prompts images et regénération</summary>` : ""}
+      <h3 style="margin-top:18px">🖼️ Images à générer dans Google Flow (${ok.length + 1})</h3>
+      <div class="note">1. Copie un prompt → Google Flow → génère → télécharge (2K si possible)<br>
+      2. <b>Renomme le fichier avec son code</b> : <code>COVER.png</code>, <code>R01.png</code>…<br>
+      3. Mets tout dans <b>un dossier Google Drive</b> → Partager → « Tous les utilisateurs disposant du lien » : Lecteur<br>
+      4. Colle le lien du dossier ci-dessous → <b>Générer l'ebook</b></div>
+      <div class="row"><button class="ghost small" data-act="copyall">Copier tous les prompts</button></div>
+      <div class="prompt"><div class="row" style="justify-content:space-between"><div><span class="code">COVER</span> · Couverture · <b>carré 1:1</b></div>
+        <button class="small" data-copy="cover">Copier</button></div><pre>${esc(files.cover_prompt)}</pre></div>
+      ${ok.map((r) => `<div class="prompt"><div class="row" style="justify-content:space-between"><div><span class="code">${esc(r.code)}</span> · ${esc(r.title)} · <b>paysage 4:3</b></div>
+        <button class="small" data-copy="${r.id}">Copier</button></div><pre>${esc(r.prompt)}</pre></div>`).join("")}
+      <div class="card" style="margin-top:14px;background:#fbf7f0">
+        <h3>Générer l'ebook</h3>
+        <label>Lien du dossier Google Drive</label><input id="drive" placeholder="https://drive.google.com/drive/folders/…" value="${esc(b.drive_folder || "")}">
+        <label>Traductions (livres en plus)</label>
+        <div class="checks"><label><input type="checkbox" id="trFr"> Français (amazon.fr)</label><label><input type="checkbox" id="trEn"> English (amazon.com)</label></div>
+        <div style="margin-top:10px"><button data-act="finish">Générer l'ebook</button></div>
+      </div>${doneImgs ? "</details>" : ""}`;
+  }
+
+  // downloads
+  const all = [b, ...(kids || [])];
+  if (all.some((x) => x.download_token || x.downloaded_at)) {
+    h += `<h3 style="margin-top:18px">⬇️ Téléchargements</h3>
+      <div class="note">Chaque lien marche <b>une seule fois</b>. Dès que le téléchargement est fini, tous les fichiers sont supprimés du serveur.</div>`;
+    for (const x of all) {
+      const lang = { de: "🇩🇪 Allemand", fr: "🇫🇷 Français", en: "🇬🇧 English" }[x.language] || x.language;
+      if (x.download_token) {
+        h += `<div class="dl"><div><b>${lang}</b><div class="muted">${x.page_count || "?"} pages · expire ${new Date(x.download_expires_at).toLocaleString("fr-FR")}</div></div>
+          <a href="${SUPABASE_URL}/functions/v1/kdp-download?t=${encodeURIComponent(x.download_token)}" data-dl="1"><button>Télécharger le .zip</button></a></div>`;
+      } else if (x.downloaded_at) {
+        h += `<div class="dl"><div><b>${lang}</b><div class="muted">Téléchargé le ${new Date(x.downloaded_at).toLocaleString("fr-FR")} · fichiers supprimés</div></div></div>`;
+      } else if (x.files?.purged) {
+        h += `<div class="dl"><div><b>${lang}</b><div class="muted">Lien expiré · fichiers supprimés</div></div></div>`;
+      }
+    }
+  }
+
+  // recipes table
+  if (recs?.length) {
+    h += `<details style="margin-top:18px"><summary class="muted">Recettes (${ok.length} retenues${bad.length ? `, ${bad.length} écartées` : ""})</summary>
+      <table><tr><th>Code</th><th>Recette</th><th>Chapitre</th><th>Statut</th></tr>
+      ${(recs || []).filter((r) => r.error !== "reserve not needed").map((r) => `<tr><td>${esc(r.code || "")}</td>
+        <td>${r.title ? esc(r.title) : `<a href="${esc(r.source_url)}" target="_blank">${esc(r.source_url.split("/").filter(Boolean).pop())}</a>`}</td>
+        <td>${esc(r.chapter || "")}</td><td>${r.status === "ok" ? "✅" : `<span class="muted">${esc(r.error || r.status)}</span>`}</td></tr>`).join("")}
+      </table></details>`;
+  }
+  $("detail").innerHTML = h;
+
+  // actions
+  $("detail").querySelectorAll("[data-copy]").forEach((el) => el.onclick = () => {
+    const t = el.dataset.copy === "cover" ? files.cover_prompt : ok.find((r) => String(r.id) === el.dataset.copy).prompt;
+    navigator.clipboard.writeText(t); toast("Prompt copié");
+  });
+  $("detail").querySelectorAll("[data-act]").forEach((el) => el.onclick = async () => {
+    const act = el.dataset.act;
+    if (act === "copyall") {
+      navigator.clipboard.writeText([`COVER (1:1)\n${files.cover_prompt}`, ...ok.map((r) => `${r.code} (4:3) — ${r.title}\n${r.prompt}`)].join("\n\n"));
+      return toast("Tous les prompts copiés");
+    }
+    el.disabled = true;
+    try {
+      if (act === "finish") {
+        const drive = $("drive").value.trim();
+        if (!/drive\.google\.com\/.*folders\//.test(drive)) throw new Error("Colle le lien d'un DOSSIER Google Drive");
+        const translate = [$("trFr").checked && "fr", $("trEn").checked && "en"].filter(Boolean).join(",");
+        await call("finish", b.slug, { drive, translate });
+        toast("Création lancée (5–20 min)");
+      } else {
+        await call(act, b.slug);
+        toast("Relancé");
+      }
+      await loadBooks(); openBook(b.slug);
+    } catch (e) { toast("❌ " + e.message); el.disabled = false; }
+  });
+  $("detail").querySelectorAll("[data-dl]").forEach((el) => el.onclick = () => setTimeout(() => openBook(b.slug), 8000));
+
+  clearTimeout(poll);
+  if (all.some((x) => RUNNING.includes(x.status))) poll = setTimeout(() => { if (current === slug) { openBook(slug); loadBooks(); } }, 10000);
+}
+
+sb.auth.onAuthStateChange((e) => { if (e === "SIGNED_OUT") boot(); });
+boot();
+</script>
+</body>
+</html>
