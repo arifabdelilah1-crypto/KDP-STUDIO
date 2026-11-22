@@ -52,6 +52,11 @@ table{width:100%;border-collapse:collapse;font-size:13px} td,th{padding:6px 4px;
 @keyframes s{to{transform:rotate(360deg)}}
 #login{max-width:380px;margin:12vh auto}
 .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;display:none;z-index:9}
+.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:12px 0}
+.thumb{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff;font-size:12px}
+.thumb img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;background:#efe7da}
+.thumb .miss{aspect-ratio:4/3;display:grid;place-items:center;background:#f6dcd8;color:var(--bad);font-weight:600}
+.thumb div.t{padding:6px 8px} .thumb b{color:var(--accent)}
 .checks{display:flex;gap:16px} .checks label{display:flex;gap:6px;align-items:center;margin:6px 0;color:var(--ink);font-size:14px} .checks input{width:auto}
 </style>
 </head>
@@ -243,7 +248,9 @@ async function openBook(slug) {
         <label>Traductions (livres en plus)</label>
         <div class="checks"><label><input type="checkbox" id="trFr"> Français (amazon.fr)</label><label><input type="checkbox" id="trEn"> English (amazon.com)</label></div>
         <div class="checks"><label><input type="checkbox" id="blogImg"> Si une image manque, utiliser celle du blog (déconseillé)</label></div>
-        <div style="margin-top:10px"><button data-act="finish">Générer l'ebook</button></div>
+        <div class="row" style="margin-top:10px"><button class="ghost" data-act="checkimg">1. Vérifier les images</button>
+          <button data-act="finish">2. Générer l'ebook</button></div>
+        <div id="imgcheck"></div>
       </div>${doneImgs ? "</details>" : ""}`;
   }
 
@@ -283,6 +290,26 @@ async function openBook(slug) {
   });
   $("detail").querySelectorAll("[data-act]").forEach((el) => el.onclick = async () => {
     const act = el.dataset.act;
+    if (act === "checkimg") {
+      const drive = $("drive").value.trim();
+      if (!/drive\.google\.com\/.*folders\//.test(drive)) return toast("Colle d'abord le lien du dossier Drive");
+      $("imgcheck").innerHTML = `<div class="note"><span class="spin"></span> Lecture du dossier…</div>`;
+      const { data, error } = await sb.functions.invoke("kdp-drive", { body: { folder: drive } });
+      let err = error ? error.message : data?.error;
+      if (error) { try { err = (await error.context.json()).error || err; } catch {} }
+      if (err) { $("imgcheck").innerHTML = `<div class="err">${esc(err)}</div>`; return; }
+      const byCode = {}; (data.files || []).forEach((f) => { if (f.code) byCode[f.code] = f; });
+      const items = [{ code: "COVER", title: "Couverture" }, ...ok.map((r) => ({ code: "R" + parseInt(r.code.slice(1), 10), label: r.code, title: r.title }))];
+      const miss = items.filter((i) => !byCode[i.code]).length;
+      const extra = (data.files || []).filter((f) => !f.code).map((f) => f.name);
+      $("imgcheck").innerHTML = `<div class="note">${miss ? `<b>${miss} image(s) manquante(s).</b> ` : "✅ Toutes les images sont là. "}
+        Vérifie que <b>chaque photo correspond au titre</b> — sinon renomme les fichiers dans Drive et revérifie.
+        ${extra.length ? `<br><span class="muted">Fichiers sans code ignorés : ${esc(extra.join(", "))}</span>` : ""}</div>
+        <div class="thumbs">${items.map((i) => { const f = byCode[i.code]; return `<div class="thumb">
+          ${f ? `<img src="${esc(f.thumb || `https://drive.google.com/thumbnail?id=${f.id}&sz=w400`)}" referrerpolicy="no-referrer" loading="lazy" onerror="this.outerHTML='<div class=miss>aperçu indisponible</div>'">` : `<div class="miss">MANQUANTE</div>`}
+          <div class="t"><b>${esc(i.label || i.code)}</b> · ${esc(i.title)}${f ? `<br><span class="muted">${esc(f.name)}</span>` : ""}</div></div>`; }).join("")}</div>`;
+      return;
+    }
     if (act === "copyall") {
       navigator.clipboard.writeText([`COVER (1:1)\n${files.cover_prompt}`, ...ok.map((r) => `${r.code} (4:3) — ${r.title}\n${r.prompt}`)].join("\n\n"));
       return toast("Tous les prompts copiés");
