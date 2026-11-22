@@ -206,6 +206,11 @@ async function openBook(slug) {
     <div class="muted">${esc(b.slug)} · ${esc(b.marketplace)} · ${ok.length}/${b.target_recipes} recettes · coût ${(+b.cost_mad).toFixed(2)} MAD</div></div>${badge(b.status)}</div>`;
   h += stepper(b.status);
   if (b.error) h += `<div class="err">${esc(b.error)}</div>`;
+  const rep = files.images_report;
+  if (rep && (b.status === "failed" || rep.missing?.length)) {
+    h += `<div class="note"><b>Images Drive :</b> ${rep.matched} reconnue(s)${rep.missing?.length ? `, <b>${rep.missing.length} manquante(s)</b> : ${esc(rep.missing.join(" · "))}` : ""}<br>
+      <span class="muted">Fichiers dans le dossier : ${esc((rep.files_in_folder || []).join(", ") || "aucun")}</span></div>`;
+  }
 
   if (RUNNING.includes(b.status)) {
     h += `<div class="note"><span class="spin"></span> ${LABEL[b.status]}… La page se met à jour toute seule. Tu peux fermer et revenir plus tard.</div>`;
@@ -226,7 +231,8 @@ async function openBook(slug) {
       2. <b>Renomme le fichier avec son code</b> : <code>COVER.png</code>, <code>R01.png</code>…<br>
       3. Mets tout dans <b>un dossier Google Drive</b> → Partager → « Tous les utilisateurs disposant du lien » : Lecteur<br>
       4. Colle le lien du dossier ci-dessous → <b>Générer l'ebook</b></div>
-      <div class="row"><button class="ghost small" data-act="copyall">Copier tous les prompts</button></div>
+      <div class="row"><button class="ghost small" data-act="copyall">Copier tous les prompts</button>
+        <button class="ghost small" data-act="refresh" title="Réécrit les recettes avec DeepSeek (codes et images conservés)">Régénérer les textes</button></div>
       <div class="prompt"><div class="row" style="justify-content:space-between"><div><span class="code">COVER</span> · Couverture · <b>carré 1:1</b></div>
         <button class="small" data-copy="cover">Copier</button></div><pre>${esc(files.cover_prompt)}</pre></div>
       ${ok.map((r) => `<div class="prompt"><div class="row" style="justify-content:space-between"><div><span class="code">${esc(r.code)}</span> · ${esc(r.title)} · <b>paysage 4:3</b></div>
@@ -236,6 +242,7 @@ async function openBook(slug) {
         <label>Lien du dossier Google Drive</label><input id="drive" placeholder="https://drive.google.com/drive/folders/…" value="${esc(b.drive_folder || "")}">
         <label>Traductions (livres en plus)</label>
         <div class="checks"><label><input type="checkbox" id="trFr"> Français (amazon.fr)</label><label><input type="checkbox" id="trEn"> English (amazon.com)</label></div>
+        <div class="checks"><label><input type="checkbox" id="blogImg"> Si une image manque, utiliser celle du blog (déconseillé)</label></div>
         <div style="margin-top:10px"><button data-act="finish">Générer l'ebook</button></div>
       </div>${doneImgs ? "</details>" : ""}`;
   }
@@ -286,7 +293,7 @@ async function openBook(slug) {
         const drive = $("drive").value.trim();
         if (!/drive\.google\.com\/.*folders\//.test(drive)) throw new Error("Colle le lien d'un DOSSIER Google Drive");
         const translate = [$("trFr").checked && "fr", $("trEn").checked && "en"].filter(Boolean).join(",");
-        await call("finish", b.slug, { drive, translate });
+        await call("finish", b.slug, { drive, translate, blog_images: $("blogImg").checked });
         toast("Création lancée (5–20 min)");
       } else {
         await call(act, b.slug);
