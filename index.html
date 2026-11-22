@@ -194,6 +194,50 @@ function stepper(status) {
   return `<div class="steps">${groups.map((g, i) => `<div class="step ${i < idx ? "done" : i === idx ? "now" : ""}">${i + 1}. ${g[0]}</div>`).join("")}</div>`;
 }
 
+const thumbUrl = (f) => f.thumb || `https://drive.google.com/thumbnail?id=${f.id}&sz=w400`;
+function renderImageMap(b, data, ok) {
+  const files = data.files || [];
+  const byId = Object.fromEntries(files.map((f) => [f.id, f]));
+  const assign = { ...(data.assign || {}) };
+  const pad = (c) => "R" + String(parseInt(c.slice(1), 10)).padStart(2, "0");
+  const items = [{ code: "COVER", title: "Couverture" }, ...ok.map((r) => ({ code: pad(r.code), title: r.title }))];
+  const draw = () => {
+    const used = new Set(Object.values(assign).map((a) => a.id));
+    const miss = items.filter((i) => !assign[i.code]).length;
+    const unused = files.filter((f) => !used.has(f.id));
+    $("imgcheck").innerHTML = `<div class="note">${data.vision ? "🤖 Photos reconnues par l'IA (Gemini vision) — les noms de fichiers n'ont pas d'importance." :
+        `⚠️ IA vision indisponible${data.visionError ? ` (${esc(data.visionError)})` : ""} — correspondance par codes dans les noms.`}<br>
+      ${miss ? `<b>${miss} recette(s) sans photo.</b> Choisis-la dans la liste sous la case.` : "✅ Chaque recette a sa photo."}
+      Vérifie d'un coup d'œil, corrige avec la liste si besoin, puis clique <b>Générer l'ebook</b>.</div>
+      <div class="thumbs">${items.map((i) => { const a = assign[i.code]; const f = a && byId[a.id];
+        const low = a && a.by === "vision" && a.conf < 0.6;
+        return `<div class="thumb" style="${low ? "border-color:var(--warn)" : ""}">
+          ${f ? `<img src="${esc(thumbUrl(f))}" referrerpolicy="no-referrer" loading="lazy">` : `<div class="miss">MANQUANTE</div>`}
+          <div class="t"><b>${esc(i.code)}</b> · ${esc(i.title)}
+          ${a ? `<br><span class="muted">${a.by === "vision" ? `IA ${Math.round(a.conf * 100)}%` : a.by === "main" ? "choisi à la main" : "nom du fichier"}${low ? " · à vérifier" : ""}</span>` : ""}
+          <select data-code="${i.code}" style="margin-top:6px;font-size:12px;padding:6px">
+            <option value="">— choisir une photo —</option>
+            ${files.map((x) => `<option value="${x.id}" ${a && a.id === x.id ? "selected" : ""}>${esc(x.name)}</option>`).join("")}
+          </select></div></div>`; }).join("")}</div>
+      ${unused.length ? `<div class="muted" style="margin-top:6px">Photos non utilisées (${unused.length}) :</div>
+        <div class="thumbs">${unused.map((f) => `<div class="thumb"><img src="${esc(thumbUrl(f))}" referrerpolicy="no-referrer" loading="lazy"><div class="t muted">${esc(f.name)}</div></div>`).join("")}</div>` : ""}`;
+    $("imgcheck").querySelectorAll("select[data-code]").forEach((sel) => sel.onchange = async () => {
+      const c = sel.dataset.code;
+      if (!sel.value) delete assign[c];
+      else {
+        for (const k of Object.keys(assign)) if (assign[k].id === sel.value) delete assign[k];   // one photo = one recipe
+        assign[c] = { id: sel.value, name: byId[sel.value].name, conf: 1, by: "main" };
+      }
+      const { data: cur } = await sb.from("kdp_books").select("files").eq("id", b.id).single();
+      const im = { ...(cur.files.image_map || {}), assign };
+      const { error } = await sb.from("kdp_books").update({ files: { ...cur.files, image_map: im } }).eq("id", b.id);
+      toast(error ? "❌ " + error.message : "Photo mise à jour");
+      draw();
+    });
+  };
+  draw();
+}
+
 async function openBook(slug) {
   current = slug; location.hash = slug; document.body.classList.add("has-book");
   document.querySelectorAll(".book").forEach((el) => el.classList.toggle("sel", el.dataset.slug === slug));
@@ -233,8 +277,8 @@ async function openBook(slug) {
     h += `${doneImgs ? `<details style="margin-top:18px"><summary class="muted">Prompts images et regénération</summary>` : ""}
       <h3 style="margin-top:18px">🖼️ Images à générer dans Google Flow (${ok.length + 1})</h3>
       <div class="note">1. Copie un prompt → Google Flow → génère → télécharge (2K si possible)<br>
-      2. <b>Renomme le fichier avec son code</b> : <code>COVER.png</code>, <code>R01.png</code>…<br>
-      3. Mets tout dans <b>un dossier Google Drive</b> → Partager → « Tous les utilisateurs disposant du lien » : Lecteur<br>
+      2. Mets les images dans un dossier Drive <b>sans les renommer</b> (l'IA reconnaît chaque photo)<br>
+      3. Partage le dossier → « Tous les utilisateurs disposant du lien » : Lecteur<br>
       4. Colle le lien du dossier ci-dessous → <b>Générer l'ebook</b></div>
       <div class="row"><button class="ghost small" data-act="copyall">Copier tous les prompts</button>
         <button class="ghost small" data-act="refresh" title="Réécrit les recettes avec DeepSeek (codes et images conservés)">Régénérer les textes</button></div>
@@ -248,7 +292,7 @@ async function openBook(slug) {
         <label>Traductions (livres en plus)</label>
         <div class="checks"><label><input type="checkbox" id="trFr"> Français (amazon.fr)</label><label><input type="checkbox" id="trEn"> English (amazon.com)</label></div>
         <div class="checks"><label><input type="checkbox" id="blogImg"> Si une image manque, utiliser celle du blog (déconseillé)</label></div>
-        <div class="row" style="margin-top:10px"><button class="ghost" data-act="checkimg">1. Vérifier les images</button>
+        <div class="row" style="margin-top:10px"><button class="ghost" data-act="checkimg">1. Reconnaître les images</button>
           <button data-act="finish">2. Générer l'ebook</button></div>
         <div id="imgcheck"></div>
       </div>${doneImgs ? "</details>" : ""}`;
@@ -293,21 +337,12 @@ async function openBook(slug) {
     if (act === "checkimg") {
       const drive = $("drive").value.trim();
       if (!/drive\.google\.com\/.*folders\//.test(drive)) return toast("Colle d'abord le lien du dossier Drive");
-      $("imgcheck").innerHTML = `<div class="note"><span class="spin"></span> Lecture du dossier…</div>`;
-      const { data, error } = await sb.functions.invoke("kdp-drive", { body: { folder: drive } });
+      $("imgcheck").innerHTML = `<div class="note"><span class="spin"></span> L'IA regarde chaque photo et la relie à sa recette… (30–60 s)</div>`;
+      const { data, error } = await sb.functions.invoke("kdp-drive", { body: { folder: drive, book: b.slug } });
       let err = error ? error.message : data?.error;
       if (error) { try { err = (await error.context.json()).error || err; } catch {} }
       if (err) { $("imgcheck").innerHTML = `<div class="err">${esc(err)}</div>`; return; }
-      const byCode = {}; (data.files || []).forEach((f) => { if (f.code) byCode[f.code] = f; });
-      const items = [{ code: "COVER", title: "Couverture" }, ...ok.map((r) => ({ code: "R" + parseInt(r.code.slice(1), 10), label: r.code, title: r.title }))];
-      const miss = items.filter((i) => !byCode[i.code]).length;
-      const extra = (data.files || []).filter((f) => !f.code).map((f) => f.name);
-      $("imgcheck").innerHTML = `<div class="note">${miss ? `<b>${miss} image(s) manquante(s).</b> ` : "✅ Toutes les images sont là. "}
-        Vérifie que <b>chaque photo correspond au titre</b> — sinon renomme les fichiers dans Drive et revérifie.
-        ${extra.length ? `<br><span class="muted">Fichiers sans code ignorés : ${esc(extra.join(", "))}</span>` : ""}</div>
-        <div class="thumbs">${items.map((i) => { const f = byCode[i.code]; return `<div class="thumb">
-          ${f ? `<img src="${esc(f.thumb || `https://drive.google.com/thumbnail?id=${f.id}&sz=w400`)}" referrerpolicy="no-referrer" loading="lazy" onerror="this.outerHTML='<div class=miss>aperçu indisponible</div>'">` : `<div class="miss">MANQUANTE</div>`}
-          <div class="t"><b>${esc(i.label || i.code)}</b> · ${esc(i.title)}${f ? `<br><span class="muted">${esc(f.name)}</span>` : ""}</div></div>`; }).join("")}</div>`;
+      renderImageMap(b, data, ok);
       return;
     }
     if (act === "copyall") {
@@ -319,6 +354,9 @@ async function openBook(slug) {
       if (act === "finish") {
         const drive = $("drive").value.trim();
         if (!/drive\.google\.com\/.*folders\//.test(drive)) throw new Error("Colle le lien d'un DOSSIER Google Drive");
+        const fid = (drive.match(/folders\/([A-Za-z0-9_-]+)/) || [])[1];
+        const { data: cur } = await sb.from("kdp_books").select("files").eq("id", b.id).single();
+        if (cur?.files?.image_map?.folder !== fid) throw new Error("Clique d'abord sur « 1. Vérifier les images »");
         const translate = [$("trFr").checked && "fr", $("trEn").checked && "en"].filter(Boolean).join(",");
         await call("finish", b.slug, { drive, translate, blog_images: $("blogImg").checked });
         toast("Création lancée (5–20 min)");
