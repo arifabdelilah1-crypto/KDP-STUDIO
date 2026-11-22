@@ -205,16 +205,16 @@ function renderImageMap(b, data, ok) {
     const used = new Set(Object.values(assign).map((a) => a.id));
     const miss = items.filter((i) => !assign[i.code]).length;
     const unused = files.filter((f) => !used.has(f.id));
-    $("imgcheck").innerHTML = `<div class="note">${data.vision ? "🤖 Photos reconnues par l'IA (Gemini vision) — les noms de fichiers n'ont pas d'importance." :
-        `⚠️ IA vision indisponible${data.visionError ? ` (${esc(data.visionError)})` : ""} — correspondance par codes dans les noms.`}<br>
+    $("imgcheck").innerHTML = `<div class="note">${data.vision ? "🤖 Photos reconnues par leur nom + l'IA vision." :
+        `📝 Photos reliées aux recettes d'après leur nom de fichier${data.visionError ? ` (vision : ${esc(data.visionError)})` : ""}.`}<br>
       ${miss ? `<b>${miss} recette(s) sans photo.</b> Choisis-la dans la liste sous la case.` : "✅ Chaque recette a sa photo."}
       Vérifie d'un coup d'œil, corrige avec la liste si besoin, puis clique <b>Générer l'ebook</b>.</div>
       <div class="thumbs">${items.map((i) => { const a = assign[i.code]; const f = a && byId[a.id];
-        const low = a && a.by === "vision" && a.conf < 0.6;
+        const low = a && a.by !== "main" && a.conf < 0.6;
         return `<div class="thumb" style="${low ? "border-color:var(--warn)" : ""}">
           ${f ? `<img src="${esc(thumbUrl(f))}" referrerpolicy="no-referrer" loading="lazy">` : `<div class="miss">MANQUANTE</div>`}
           <div class="t"><b>${esc(i.code)}</b> · ${esc(i.title)}
-          ${a ? `<br><span class="muted">${a.by === "vision" ? `IA ${Math.round(a.conf * 100)}%` : a.by === "main" ? "choisi à la main" : "nom du fichier"}${low ? " · à vérifier" : ""}</span>` : ""}
+          ${a ? `<br><span class="muted">${a.by === "vision" ? `IA ${Math.round(a.conf * 100)}%` : a.by === "main" ? "choisi à la main" : `nom ${Math.round(a.conf * 100)}%`}${low ? " · à vérifier" : ""}</span>` : ""}
           <select data-code="${i.code}" style="margin-top:6px;font-size:12px;padding:6px">
             <option value="">— choisir une photo —</option>
             ${files.map((x) => `<option value="${x.id}" ${a && a.id === x.id ? "selected" : ""}>${esc(x.name)}</option>`).join("")}
