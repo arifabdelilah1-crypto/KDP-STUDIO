@@ -205,8 +205,8 @@ function renderImageMap(b, data, ok) {
     const used = new Set(Object.values(assign).map((a) => a.id));
     const miss = items.filter((i) => !assign[i.code]).length;
     const unused = files.filter((f) => !used.has(f.id));
-    $("imgcheck").innerHTML = `<div class="note">${data.vision ? "🤖 Photos reconnues par leur nom + l'IA vision." :
-        `📝 Photos reliées aux recettes d'après leur nom de fichier${data.visionError ? ` (vision : ${esc(data.visionError)})` : ""}.`}<br>
+    $("imgcheck").innerHTML = `<div class="note">${data.ai ? "🤖 DeepSeek a lu les noms des fichiers et relié chaque photo à sa recette." :
+        `📝 Photos reliées d'après les mots des noms de fichiers${data.aiError ? ` (DeepSeek indisponible : ${esc(data.aiError)})` : ""}.`}<br>
       ${miss ? `<b>${miss} recette(s) sans photo.</b> Choisis-la dans la liste sous la case.` : "✅ Chaque recette a sa photo."}
       Vérifie d'un coup d'œil, corrige avec la liste si besoin, puis clique <b>Générer l'ebook</b>.</div>
       <div class="thumbs">${items.map((i) => { const a = assign[i.code]; const f = a && byId[a.id];
@@ -214,7 +214,7 @@ function renderImageMap(b, data, ok) {
         return `<div class="thumb" style="${low ? "border-color:var(--warn)" : ""}">
           ${f ? `<img src="${esc(thumbUrl(f))}" referrerpolicy="no-referrer" loading="lazy">` : `<div class="miss">MANQUANTE</div>`}
           <div class="t"><b>${esc(i.code)}</b> · ${esc(i.title)}
-          ${a ? `<br><span class="muted">${a.by === "vision" ? `IA ${Math.round(a.conf * 100)}%` : a.by === "main" ? "choisi à la main" : `nom ${Math.round(a.conf * 100)}%`}${low ? " · à vérifier" : ""}</span>` : ""}
+          ${a ? `<br><span class="muted">${a.by === "main" ? "choisi à la main" : a.by === "code" ? "code dans le nom" : `${a.by === "deepseek" ? "DeepSeek" : "mots"} ${Math.round(a.conf * 100)}%`}${low ? " · à vérifier" : ""}</span>` : ""}
           <select data-code="${i.code}" style="margin-top:6px;font-size:12px;padding:6px">
             <option value="">— choisir une photo —</option>
             ${files.map((x) => `<option value="${x.id}" ${a && a.id === x.id ? "selected" : ""}>${esc(x.name)}</option>`).join("")}
@@ -277,7 +277,7 @@ async function openBook(slug) {
     h += `${doneImgs ? `<details style="margin-top:18px"><summary class="muted">Prompts images et regénération</summary>` : ""}
       <h3 style="margin-top:18px">🖼️ Images à générer dans Google Flow (${ok.length + 1})</h3>
       <div class="note">1. Copie un prompt → Google Flow → génère → télécharge (2K si possible)<br>
-      2. Mets les images dans un dossier Drive <b>sans les renommer</b> (l'IA reconnaît chaque photo)<br>
+      2. Mets les images dans un dossier Drive <b>sans les renommer</b> (DeepSeek reconnaît les noms de Flow)<br>
       3. Partage le dossier → « Tous les utilisateurs disposant du lien » : Lecteur<br>
       4. Colle le lien du dossier ci-dessous → <b>Générer l'ebook</b></div>
       <div class="row"><button class="ghost small" data-act="copyall">Copier tous les prompts</button>
@@ -337,7 +337,7 @@ async function openBook(slug) {
     if (act === "checkimg") {
       const drive = $("drive").value.trim();
       if (!/drive\.google\.com\/.*folders\//.test(drive)) return toast("Colle d'abord le lien du dossier Drive");
-      $("imgcheck").innerHTML = `<div class="note"><span class="spin"></span> L'IA regarde chaque photo et la relie à sa recette… (30–60 s)</div>`;
+      $("imgcheck").innerHTML = `<div class="note"><span class="spin"></span> DeepSeek lit les noms des fichiers et les relie aux recettes… (10–20 s)</div>`;
       const { data, error } = await sb.functions.invoke("kdp-drive", { body: { folder: drive, book: b.slug } });
       let err = error ? error.message : data?.error;
       if (error) { try { err = (await error.context.json()).error || err; } catch {} }
